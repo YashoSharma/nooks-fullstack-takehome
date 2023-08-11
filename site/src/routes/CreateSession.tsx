@@ -1,15 +1,22 @@
+import axios from "axios";
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Box, Button, TextField } from "@mui/material";
-import { v4 as uuidv4 } from "uuid";
+
 
 const CreateSession: React.FC = () => {
   const navigate = useNavigate();
   const [newUrl, setNewUrl] = useState("");
 
   const createSession = async () => {
-    setNewUrl("");
-    const sessionId = uuidv4();
+    const resp = await axios.post(
+      'http://localhost:3001/session', 
+      { 
+        videoId: newUrl
+      }
+    );
+
+    const sessionId = resp.data["sessionId"]
     navigate(`/watch/${sessionId}`);
   };
 

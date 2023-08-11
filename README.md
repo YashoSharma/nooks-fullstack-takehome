@@ -9,7 +9,8 @@ We want to respect your time, so please try not to spend more than 5 hours on th
 
 ### Instructions
 
-To run the app simply "npm i" and then "npm start"
+To run the frontend cd to site and simply "npm i" and then "npm start"
+To run the backend cd to server and simply "npm i" and then "npm start"
 
 ### Problem
 Your task is to build a collaborative “Watch Party” app that lets a distributed group of users watch youtube videos together. The frontend should be written in Typescript (we have a skeleton for you set up) and the backend should be written in Node.JS. The app should support two main pages:

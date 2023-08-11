@@ -1,16 +1,52 @@
 import { Box, Button } from "@mui/material";
 import React, { useRef, useState } from "react";
+import { useParams } from "react-router-dom";
 import ReactPlayer from "react-player";
+import { v4 as uuidv4 } from "uuid";
 
 interface VideoPlayerProps {
   url: string;
+  sessionId: string;
   hideControls?: boolean;
 }
 
 const VideoPlayer: React.FC<VideoPlayerProps> = ({ url, hideControls }) => {
+  const { sessionId } = useParams();
   const [hasJoined, setHasJoined] = useState(false);
   const [isReady, setIsReady] = useState(false);
+  const [playing, setPlaying] = useState(false);
   const player = useRef<ReactPlayer>(null);
+  const ws = new WebSocket('ws://localhost:3002/')
+  const clientId = uuidv4();
+
+  ws.onmessage = (event) => {
+    if (player.current) {
+      const msg = JSON.parse(event.data);
+      if(msg.type === 'seek') {
+        // There is an interesting interaction where updates from one client
+        // Will cause another client to trigger updates because handleplay is called
+        // when you change the current video time, not just when the video resumes from 
+        // an unpaused state. 
+        // To avoid the connections echoing updates into each other we check to see if the
+        // Update is meaningful enough to use
+        setPlaying(msg.playing);
+        if(Math.abs(player.current?.getCurrentTime() - msg.seekIdx) >= 0.3) { 
+          player.current.seekTo(msg.seekIdx);
+        }
+      }
+    }
+  };
+
+  const initWatchSession = () => {
+    ws.send(JSON.stringify({
+      'type': 'init',
+      'clientId': clientId,
+      'sessionId': sessionId,
+      'syncTime': Date.now()
+    }));
+
+    setHasJoined(true);
+  }
 
   const handleReady = () => {
     setIsReady(true);
@@ -21,12 +57,6 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ url, hideControls }) => {
   };
 
   const handleSeek = (seconds: number) => {
-    // Ideally, the seek event would be fired whenever the user moves the built in Youtube video slider to a new timestamp.
-    // However, the youtube API no longer supports seek events (https://github.com/cookpete/react-player/issues/356), so this no longer works
-
-    // You'll need to find a different way to detect seeks (or just write your own seek slider and replace the built in Youtube one.)
-    // Note that when you move the slider, you still get play, pause, buffer, and progress events, can you use those?
-
     console.log(
       "This never prints because seek decetion doesn't work: ",
       seconds
@@ -38,6 +68,16 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ url, hideControls }) => {
       "User played video at time: ",
       player.current?.getCurrentTime()
     );
+
+    ws.send(JSON.stringify({
+      'type': 'seek',
+      'clientId': clientId,
+      'sessionId': sessionId,
+      'seekIdx': player.current?.getCurrentTime(),
+      'playing': true,
+      'syncTime': Date.now()
+    }));
+    setPlaying(true);
   };
 
   const handlePause = () => {
@@ -45,9 +85,27 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ url, hideControls }) => {
       "User paused video at time: ",
       player.current?.getCurrentTime()
     );
+
+    ws.send(JSON.stringify({
+      'type': 'seek',
+      'clientId': clientId,
+      'sessionId': sessionId,
+      'seekIdx': player.current?.getCurrentTime(),
+      'playing': false,
+      'syncTime': Date.now()
+    }));
+    setPlaying(false);
   };
 
   const handleBuffer = () => {
+    ws.send(JSON.stringify({
+      'type': 'seek',
+      'clientId': clientId,
+      'sessionId': sessionId,
+      'seekIdx': player.current?.getCurrentTime(),
+      'playing': playing,
+      'syncTime': Date.now()
+    }));
     console.log("Video buffered");
   };
 
@@ -78,7 +136,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ url, hideControls }) => {
         <ReactPlayer
           ref={player}
           url={url}
-          playing={hasJoined}
+          playing={hasJoined && playing}
           controls={!hideControls}
           onReady={handleReady}
           onEnded={handleEnd}
@@ -99,7 +157,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ url, hideControls }) => {
         <Button
           variant="contained"
           size="large"
-          onClick={() => setHasJoined(true)}
+          onClick={initWatchSession}
         >
           Watch Session
         </Button>

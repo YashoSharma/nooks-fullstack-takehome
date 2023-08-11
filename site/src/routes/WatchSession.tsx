@@ -1,3 +1,4 @@
+import axios from "axios";
 import { useEffect, useState } from "react";
 import VideoPlayer from "../components/VideoPlayer";
 import { useNavigate, useParams } from "react-router-dom";
@@ -12,11 +13,17 @@ const WatchSession: React.FC = () => {
 
   const [linkCopied, setLinkCopied] = useState(false);
 
-  useEffect(() => {
-    // load video by session ID -- right now we just hardcode a constant video but you should be able to load the video associated with the session
-    setUrl("https://www.youtube.com/watch?v=NX1eKLReSpY");
+  const resolveSession = async () => {
+    try {
+      const resp = await axios.get(`http://localhost:3001/session/${sessionId}`);
+      setUrl(resp.data["videoId"]);
+    } catch (error) {
+      navigate("/create");
+    }
+  };
 
-    // if session ID doesn't exist, you'll probably want to redirect back to the home / create session page
+  useEffect(() => {
+    resolveSession()
   }, [sessionId]);
 
   if (!!url) {
@@ -66,7 +73,7 @@ const WatchSession: React.FC = () => {
             </Button>
           </Tooltip>
         </Box>
-        <VideoPlayer url={url} />;
+        <VideoPlayer url={url} sessionId={sessionId!}/>;
       </>
     );
   }
